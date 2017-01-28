@@ -90,6 +90,10 @@ class PCA9685(object):
 
     def set_pwm(self, channel, on, off):
         """Sets a single PWM channel."""
+        if on is None or off is None:
+            i2c.write(self.address, bytearray([LED0_ON_L+4*channel])) # write register we want to read from first
+            data = i2c.read(self.address, 4)
+            return ustruct.unpack('<HH', data)
         i2c.write(self.address, bytearray([LED0_ON_L+4*channel, on & 0xFF]))
         i2c.write(self.address, bytearray([LED0_ON_H+4*channel, on >> 8]))
         i2c.write(self.address, bytearray([LED0_OFF_L+4*channel, off & 0xFF]))
@@ -101,3 +105,25 @@ class PCA9685(object):
         i2c.write(self.address, bytearray([ALL_LED_ON_H, on >> 8]))
         i2c.write(self.address, bytearray([ALL_LED_OFF_L, off & 0xFF]))
         i2c.write(self.address, bytearray([ALL_LED_OFF_H, off >> 8]))
+
+    def duty(self, index, value=None, invert=False):
+        if value is None:
+            pwm = self.set_pwm(index)
+            if pwm == (0, 4096):
+                value = 0
+            elif pwm == (4096, 0):
+                value = 4095
+            value = pwm[1]
+            if invert:
+                value = 4095 - value
+            return value
+        if not 0 <= value <= 4095:
+            raise ValueError("Out of range")
+        if invert:
+            value = 4095 - value
+        if value == 0:
+            self.set_pwm(index, 0, 4096)
+        elif value == 4095:
+            self.set_pwm(index, 4096, 0)
+        else:
+            self.set_pwm(index, 0, value)
